@@ -68,4 +68,4 @@ When you generate or download an updated version of **SupplierMap** from Claude 
    ```bash
    git push origin main
    ```
-   You may be asked to confirm your identity / log in to github, just follow their instructioins and do so.
+   *You may be asked to confirm your identity / log in to github, just follow their instructioins and do so.*
