@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supplier Map</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233d6b7d'/%3E%3Cpath d='M32 12c-9.4 0-17 7.2-17 16.8C15 41.6 32 54 32 54s17-12.4 17-25.2C49 19.2 41.4 12 32 12z' fill='%23fdf6ec'/%3E%3Ccircle cx='32' cy='28' r='7' fill='%233d6b7d'/%3E%3C/svg%3E">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/organic-39bb78c5-7d94-486e-86fe-3ac2fbff1b94/styles.css">
+  <script src="_ds/organic-39bb78c5-7d94-486e-86fe-3ac2fbff1b94/_ds_bundle.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: var(--color-bg); }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--color-neutral-300); border-radius: 999px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</helmet>
+
+<div style="position:relative; width:100%; height:100vh; font-family:var(--font-body); color:var(--color-text); overflow:hidden;">
+
+  <div id="supplier-map" style="position:absolute; inset:0; z-index:0;"></div>
+
+  <div style="position:absolute; top:20px; left:20px; right:20px; height:48px; display:flex; align-items:center; gap:12px; pointer-events:none; z-index:1000;">
+    <button onClick="{{ toggleSidebar }}" aria-label="Toggle categories" style="pointer-events:auto; flex-shrink:0; border:none; background:var(--color-neutral-100); border-radius:999px; box-shadow:var(--shadow-md); width:48px; height:48px; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:var(--color-accent-100)">
+      {{ sidebarIconEl }}
+    </button>
+
+    <div style="flex:1; display:flex; justify-content:center;">
+      <div style="display:flex; align-items:center; gap:10px; background:var(--color-neutral-100); border-radius:999px; box-shadow:var(--shadow-md); height:48px; box-sizing:border-box; padding:0 20px; width:100%; max-width:480px; pointer-events:auto;">
+        {{ searchIconEl }}
+        <input type="text" placeholder="Search suppliers…" value="{{ searchTerm }}" onChange="{{ onSearchChange }}" style="border:none; outline:none; background:transparent; font-family:var(--font-body); font-size:16px; color:var(--color-text); width:100%;" />
+        <sc-if value="{{ hasSearch }}">
+          <button onClick="{{ clearSearch }}" style="border:none; background:var(--color-neutral-200); border-radius:999px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;" style-hover="background:var(--color-neutral-300)">
+            {{ clearIconEl }}
+          </button>
+        </sc-if>
+      </div>
+    </div>
+
+    <button onClick="{{ refresh }}" aria-label="Re-parse from Google Maps" title="Re-parse points from Google Maps" style="pointer-events:auto; flex-shrink:0; border:none; background:var(--color-neutral-100); border-radius:999px; box-shadow:var(--shadow-md); width:48px; height:48px; display:flex; align-items:center; justify-content:center; cursor:pointer;" style-hover="background:var(--color-accent-100)">
+      {{ refreshIconEl }}
+    </button>
+  </div>
+
+  <div style="{{ sidebarWrapStyle }}">
+    <div style="padding:20px 20px 12px; border-bottom:1px solid var(--color-neutral-200); flex-shrink:0;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+        <div style="font-family:var(--font-heading); font-size:22px; color:var(--color-text); line-height:1.1;">Supplier Categories</div>
+        <div style="font-size:12px; color:var(--color-neutral-700); flex-shrink:0;">{{ totalLabel }}</div>
+      </div>
+      <div style="font-size:13px; color:var(--color-neutral-700); margin-top:4px;">{{ statusText }}</div>
+    </div>
+
+    <div style="flex:1; overflow-y:auto; padding:8px 12px 12px;">
+      <sc-for list="{{ categories }}" as="cat" hint-placeholder-count="4">
+        <div style="border-bottom:1px solid var(--color-neutral-200); padding:12px 8px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <button onClick="{{ cat.onToggle }}" aria-pressed="{{ cat.enabled }}" style="{{ cat.switchTrackStyle }}" style-hover="box-shadow: 0 0 0 3px var(--color-accent-100);">
+              <div style="{{ cat.switchThumbStyle }}"></div>
+            </button>
+
+            <button onClick="{{ cat.onSwatchToggle }}" title="Change category color" style="{{ cat.swatchStyle }}" style-hover="transform:scale(1.12)"></button>
+
+            <button onClick="{{ cat.onExpand }}" style="flex:1; display:flex; align-items:center; justify-content:space-between; background:none; border:none; cursor:pointer; padding:4px 0; text-align:left;">
+              <span style="display:flex; align-items:center; gap:8px;">
+                <span style="font-family:var(--font-heading); font-size:16px; color:var(--color-text);">{{ cat.name }}</span>
+              </span>
+              <span style="display:flex; align-items:center; gap:8px;">
+                <span style="{{ cat.tagStyle }}">{{ cat.countLabel }}</span>
+                {{ cat.chevronEl }}
+              </span>
+            </button>
+          </div>
+
+          <sc-if value="{{ cat.pickerOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="margin:10px 0 4px 44px; background:var(--color-neutral-100); border:1px solid var(--color-neutral-200); border-radius:var(--radius-md); box-shadow:var(--shadow-md); padding:12px; width:216px; box-sizing:border-box;">
+              <div onPointerDown="{{ cat.onSvDown }}" style="{{ cat.svStyle }}">
+                <div style="{{ cat.svThumbStyle }}"></div>
+              </div>
+              <div onPointerDown="{{ cat.onHueDown }}" style="{{ cat.hueStyle }}">
+                <div style="{{ cat.hueThumbStyle }}"></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+                <span style="{{ cat.previewStyle }}"></span>
+                <input type="text" value="{{ cat.hex }}" onChange="{{ cat.onHexChange }}" spellcheck="false" style="flex:1; min-width:0; font-family:var(--font-mono, monospace); font-size:13px; text-transform:uppercase; border:1px solid var(--color-neutral-300); border-radius:6px; padding:6px 8px; outline:none; color:var(--color-text); background:var(--color-surface);" />
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">
+                <sc-for list="{{ cat.presets }}" as="p" hint-placeholder-count="8">
+                  <button onClick="{{ p.onPick }}" title="{{ p.hex }}" style="{{ p.style }}"></button>
+                </sc-for>
+              </div>
+              <button onClick="{{ cat.onPickerClose }}" style="margin-top:10px; width:100%; border:none; background:var(--color-accent-700); color:var(--color-neutral-100); border-radius:999px; padding:7px 0; font-size:13px; font-weight:600; cursor:pointer;" style-hover="background:var(--color-accent-800)">Done</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ cat.showList }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:8px; padding-left:44px; display:flex; flex-direction:column; gap:4px;">
+              <sc-for list="{{ cat.visibleItems }}" as="item" hint-placeholder-count="3">
+                <div onClick="{{ item.onSelect }}" style="{{ item.rowStyle }}" style-hover="background:var(--color-accent-100)">
+                  {{ item.pinEl }}
+                  <span style="font-size:14px; color:var(--color-text); flex:1; line-height:1.25;">{{ item.name }}</span>
+                  <sc-if value="{{ item.selected }}" hint-placeholder-val="{{ false }}">
+                    {{ item.checkEl }}
+                  </sc-if>
+                </div>
+              </sc-for>
+
+              <sc-if value="{{ cat.noMatches }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:13px; color:var(--color-neutral-700); padding:4px 8px; font-style:italic;">No suppliers match your search.</div>
+              </sc-if>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:var(--color-accent-700); color:var(--color-neutral-100); border-radius:999px; box-shadow:var(--shadow-lg); padding:10px 10px 10px 20px; display:flex; align-items:center; gap:14px; z-index:1000;">
+      <span style="font-size:14px; font-family:var(--font-heading);">{{ selectionLabel }}</span>
+      <button onClick="{{ clearSelection }}" style="background:rgba(255,255,255,0.18); border:none; color:var(--color-neutral-100); border-radius:999px; padding:8px 14px; font-size:13px; cursor:pointer;" style-hover="background:rgba(255,255,255,0.28)">Clear</button>
+      <button onClick="{{ planRoute }}" style="background:var(--color-neutral-100); border:none; color:var(--color-accent-700); border-radius:999px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;" style-hover="background:var(--color-accent-100)">
+        {{ routeIconEl }}
+        Plan route
+      </button>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const MID = '14yOcErr3NwLSEdEjup9eeUiRr7Bm_1I';
+const CAT_COLORS = ['#b2622d', '#4f7d8c', '#728157', '#c2903a'];
+
+const ICON_PATHS = {
+  'search': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  'x': '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'refresh-cw': '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  'map-pin': '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  'map-pin-off': '<path d="M5.43 5.43A8 8 0 0 0 4 10c0 4.993 5.539 10.193 7.399 11.799a1 1 0 0 0 1.202 0 32 32 0 0 0 .813-.72"/><path d="M19.18 15.37A15.6 15.6 0 0 0 20 10a8 8 0 0 0-12.9-6.31"/><path d="m2 2 20 20"/>',
+  'chevron-up': '<path d="m18 15-6-6-6 6"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+  'check': '<path d="M20 6 9 17l-5-5"/>',
+  'route': '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  'panel-left-close': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/>',
+  'panel-left-open': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/>',
+};
+
+function svgIcon(name, size, color, extraStyle) {
+  return React.createElement('svg', {
+    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: color || 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+    style: Object.assign({ flexShrink: 0, display: 'block' }, extraStyle || {}),
+    dangerouslySetInnerHTML: { __html: ICON_PATHS[name] || '' },
+  });
+}
+
+
+function slug(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+
+const PRESETS = ['#b2622d','#c67139','#c2903a','#7a8a5e','#728157','#4f7d8c','#3d6b7d','#8c4f6b','#6b4f8c','#b23d3d','#2f7d4f','#201e1d'];
+
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+function rgbToHex(r, g, b) {
+  const h = x => Math.round(x).toString(16).padStart(2, '0');
+  return '#' + h(r) + h(g) + h(b);
+}
+function rgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return { h, s: max ? d / max : 0, v: max };
+}
+function hsvToRgb(h, s, v) {
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
+}
+function hexToHsv(hex) { const c = hexToRgb(hex) || { r: 0, g: 0, b: 0 }; return rgbToHsv(c.r, c.g, c.b); }
+function hsvToHex(h, s, v) { const c = hsvToRgb(h, s, v); return rgbToHex(c.r, c.g, c.b); }
+
+const COLOR_COOKIE = 'supplierMapColors';
+
+function setCookie(name, value, days) {
+  const exp = new Date(Date.now() + (days || 365) * 864e5).toUTCString();
+  document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + exp + '; path=/; SameSite=Lax';
+}
+function getCookie(name) {
+  const m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function loadColorConfig() {
+  try { const raw = getCookie(COLOR_COOKIE); if (raw) return JSON.parse(raw); } catch (e) {}
+  try { const ls = localStorage.getItem(COLOR_COOKIE); if (ls) return JSON.parse(ls); } catch (e) {}
+  return {};
+}
+function saveColorConfig(data) {
+  const cfg = {};
+  data.forEach(c => { cfg[c.id] = c.color; });
+  const str = JSON.stringify(cfg);
+  setCookie(COLOR_COOKIE, str, 365);            // per-user cookie (real deployments)
+  try { localStorage.setItem(COLOR_COOKIE, str); } catch (e) {} // fallback (sandboxed previews)
+}
+
+function buildCats(raw) {
+  // LiveOnly: build fresh from the newest data every time; only saved colors persist.
+  const saved = loadColorConfig();
+  return raw.map((f, i) => {
+    const id = slug(f.name) || ('cat-' + i);
+    return {
+      id,
+      name: f.name,
+      color: saved[id] || CAT_COLORS[i % CAT_COLORS.length],
+      enabled: true,
+      expanded: (i === 0),
+      items: f.items,
+    };
+  });
+}
+
+class Component extends DCLogic {
+  state = {
+    searchTerm: '',
+    sidebarOpen: false,
+    selected: {},
+    loading: false,
+    lastSync: 'Loading live data from Google Maps…',
+    data: [],
+    pickerFor: null,
+    hsv: { h: 0, s: 0, v: 0 },
+  };
+
+  componentDidMount() {
+    import('./mini-map.js').then((mod) => { this.MiniMap = mod.MiniMap; this._initMap(); });
+    this.refresh(); // LiveOnly: always pull fresh data on load, no bundled backup
+  }
+
+  componentDidUpdate() {
+    this._syncMarkers();
+  }
+
+  componentWillUnmount() {
+    if (this.mm) this.mm.destroy();
+  }
+
+  _initMap() {
+    if (this.mm || !this.MiniMap) return;
+    const el = document.getElementById('supplier-map');
+    if (!el) return;
+    this.mm = new this.MiniMap(el, {
+      center: [35.905, 14.42], zoom: 11, minZoom: 2, maxZoom: 20,
+      tileUrl: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      subdomains: 'abcd',
+      attribution: '© OpenStreetMap © CARTO · points from Google My Maps',
+    });
+    this._syncMarkers();
+    const pts = [];
+    this.state.data.forEach(c => c.items.forEach(it => { if (isFinite(it.lat) && isFinite(it.lng)) pts.push([it.lat, it.lng]); }));
+    if (pts.length) this.mm.fitBounds(pts, { padding: [60, 60], paddingTopLeft: [380, 80] });
+    this._applyMinZoom();
+  }
+
+  _applyMinZoom() {
+    if (!this.mm) return;
+    const pts = [];
+    this.state.data.forEach(c => c.items.forEach(it => { if (isFinite(it.lat) && isFinite(it.lng)) pts.push([it.lat, it.lng]); }));
+    if (pts.length < 2) { this.mm.setMinZoom(8); return; }
+    const z = this.mm.getBoundsZoom(pts, {});
+    this.mm.setMinZoom(isFinite(z) ? Math.max(z - 3.5, 6) : 8);
+  }
+
+  _syncMarkers() {
+    if (!this.mm) return;
+    const search = this.state.searchTerm.trim().toLowerCase();
+    const esc = s => (s || '').replace(/</g, '&lt;');
+    const list = [];
+    this.state.data.forEach(cat => {
+      cat.items.forEach((it, idx) => {
+        const valid = isFinite(it.lat) && isFinite(it.lng) && Math.abs(it.lat) <= 90 && Math.abs(it.lng) <= 180 && !(it.lat === 0 && it.lng === 0);
+        if (!valid) return;
+        const k = cat.id + '::' + idx;
+        const match = !search || it.name.toLowerCase().includes(search);
+        let html = '<strong>' + esc(it.name) + '</strong><br>' + esc(cat.name);
+        if (it.approx) {
+          html += '<br><span style="color:#b06a2c;font-size:11px;">≈ Approximate — geocoded from address</span>';
+          if (it.address) html += '<br><span style="color:#6b625a;font-size:11px;">' + esc(it.address) + '</span>';
+        }
+        list.push({
+          id: k, lat: it.lat, lng: it.lng, color: cat.color,
+          approxMeters: it.approx ? 150 : 0,
+          selected: !!this.state.selected[k],
+          visible: cat.enabled && match,
+          popupHtml: html,
+          onClick: () => this._selectFromMap(k),
+        });
+      });
+    });
+    this.mm.setMarkers(list);
+  }
+
+  _selectFromMap(k) {
+    this.setState(s => {
+      const sel = { ...s.selected };
+      if (sel[k]) delete sel[k]; else sel[k] = true;
+      return { selected: sel };
+    });
+  }
+
+  toggleCategory(id) {
+    this.setState(s => ({ data: s.data.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c) }));
+  }
+
+  setCategoryColor(id, color) {
+    this.setState(s => {
+      const data = s.data.map(c => c.id === id ? { ...c, color } : c);
+      saveColorConfig(data);
+      return { data };
+    }, () => this._syncMarkers());
+  }
+
+  togglePicker(id) {
+    this.setState(s => {
+      if (s.pickerFor === id) return { pickerFor: null };
+      const cat = s.data.find(c => c.id === id);
+      return { pickerFor: id, hsv: hexToHsv(cat.color) };
+    });
+  }
+
+  closePicker() {
+    saveColorConfig(this.state.data);
+    this.setState({ pickerFor: null });
+  }
+
+  _applyHsv(partial) {
+    const id = this.state.pickerFor;
+    if (!id) return;
+    const hsv = { ...this.state.hsv, ...partial };
+    const hex = hsvToHex(hsv.h, hsv.s, hsv.v);
+    this.setState(s => ({ hsv, data: s.data.map(c => c.id === id ? { ...c, color: hex } : c) }));
+    this._syncMarkers();
+  }
+
+  setPickerHex(hex) {
+    if (!/^#?[0-9a-f]{6}$/i.test((hex || '').trim())) return;
+    if (hex[0] !== '#') hex = '#' + hex;
+    const id = this.state.pickerFor;
+    this.setState(s => ({ hsv: hexToHsv(hex), data: s.data.map(c => c.id === id ? { ...c, color: hex } : c) }));
+    this._syncMarkers();
+  }
+
+  _dragValue(e, vertical) {
+    const rect = this._dragRect;
+    const x = clamp01((e.clientX - rect.left) / rect.width);
+    const y = clamp01((e.clientY - rect.top) / rect.height);
+    return vertical ? y : x;
+  }
+
+  _startDrag(e, kind) {
+    e.preventDefault();
+    this._dragRect = e.currentTarget.getBoundingClientRect();
+    const apply = (ev) => {
+      if (kind === 'sv') {
+        this._applyHsv({
+          s: clamp01((ev.clientX - this._dragRect.left) / this._dragRect.width),
+          v: 1 - clamp01((ev.clientY - this._dragRect.top) / this._dragRect.height),
+        });
+      } else {
+        this._applyHsv({ h: clamp01((ev.clientX - this._dragRect.left) / this._dragRect.width) * 360 });
+      }
+    };
+    apply(e);
+    const move = (ev) => apply(ev);
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      saveColorConfig(this.state.data);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  expandCategory(id) {
+    this.setState(s => ({ data: s.data.map(c => c.id === id ? { ...c, expanded: !c.expanded } : c) }));
+  }
+
+  focusItem(k, it) {
+    if (this.mm && isFinite(it.lat) && isFinite(it.lng)) {
+      this.mm.setView(it.lat, it.lng, 16, { animate: true });
+      this.mm.openPopupFor(k);
+    }
+    this._selectFromMap(k);
+  }
+
+  async refresh() {
+    if (this.state.loading) return;
+    this._geocodeGen = (this._geocodeGen || 0) + 1;
+    this.setState({ loading: true, lastSync: 'Checking for updates…' });
+    try {
+      const res = await fetch('./data.json?_=' + Date.now());
+      if (!res.ok) throw new Error('data.json HTTP ' + res.status + ' — has the sync workflow run yet?');
+      const json = await res.json();
+      const parsed = json.categories || [];
+      if (!parsed.length) { this.setState({ loading: false, data: [], selected: {}, lastSync: 'data.json has no categories yet' }, () => { try { this._syncMarkers(); } catch (e) {} }); return; }
+      const total = parsed.reduce((a, f) => a + f.items.length, 0);
+      this.setState({
+        data: buildCats(parsed),
+        loading: false,
+        selected: {},
+        lastSync: 'Synced ' + total + ' points · ' + (json.syncedAt ? new Date(json.syncedAt).toLocaleString() : ''),
+      }, () => {
+        try { this._syncMarkers(); } catch (e) {}
+        setTimeout(() => {
+          if (!this.mm) return;
+          this.mm.invalidateSize();
+          const pts = [];
+          this.state.data.forEach(c => c.items.forEach(it => {
+            if (isFinite(it.lat) && isFinite(it.lng)) pts.push([it.lat, it.lng]);
+          }));
+          if (pts.length) this.mm.fitBounds(pts, { padding: [60, 60], paddingTopLeft: [380, 80] });
+          this._applyMinZoom();
+        }, 60);
+        this._geocodeMissing().catch(() => {});
+      });
+    } catch (e) {
+      this.setState({ loading: false, data: [], selected: {}, lastSync: 'Could not load data.json: ' + (e.message || e) }, () => { try { this._syncMarkers(); } catch (err) {} });
+    }
+  }
+
+  _parseKml(text) {
+    const doc = new DOMParser().parseFromString(text, 'text/xml');
+    const ln = (el, tag) => Array.from(el.children).filter(c => (c.localName || c.tagName).toLowerCase() === tag);
+    const allByTag = (root, tag) => Array.from(root.getElementsByTagName(tag)).length
+      ? Array.from(root.getElementsByTagName(tag))
+      : Array.from(root.getElementsByTagName('*')).filter(c => (c.localName || c.tagName).toLowerCase() === tag);
+    const folders = allByTag(doc, 'folder');
+    return folders.map(f => {
+      const nameEl = ln(f, 'name')[0];
+      const name = (nameEl ? nameEl.textContent : '').trim();
+      const items = ln(f, 'placemark').map(pm => {
+        const nmEl = ln(pm, 'name')[0];
+        const nm = (nmEl ? nmEl.textContent : '').trim();
+        const coordEls = allByTag(pm, 'coordinates');
+        const coord = (coordEls[0] ? coordEls[0].textContent : '').trim();
+        if (coord) {
+          const parts = coord.split(',').map(s => Number(s.trim()));
+          if (isFinite(parts[1]) && isFinite(parts[0])) return { name: nm, lat: parts[1], lng: parts[0] };
+        }
+        // address-only placemark → geocode later
+        const adEl = ln(pm, 'address')[0];
+        const address = (adEl ? adEl.textContent : '').trim();
+        if (address) return { name: nm, lat: undefined, lng: undefined, approx: true, address };
+        return null;
+      }).filter(Boolean);
+      return { name, items };
+    }).filter(f => f.items.length);
+  }
+
+  _geoCandidates(name, address) {
+    let a = (address || '').replace(/\([^)]*\)/g, ' ');
+    a = a.replace(/\b[A-Z]{3}\s?\d{4}\b/g, ' ');
+    a = a.replace(/\bLevel\s*\d+\b/gi, ' ').replace(/\b\d+,/g, ',');
+    a = a.split(';')[0].trim();
+    if (name && a.toLowerCase().startsWith(name.toLowerCase().slice(0, 6))) {
+      a = a.slice(name.length).replace(/^[\s,.-]+/, '');
+    }
+    const parts = a.split(',').map(s => s.replace(/\s+/g, ' ').trim())
+      .filter(p => p && !/^malta$/i.test(p) && p.length > 2);
+    const cands = [];
+    for (let i = 0; i < parts.length; i++) cands.push(parts.slice(i).join(', ') + ', Malta');
+    if (parts.length) cands.push(parts[parts.length - 1] + ', Malta');
+    return Array.from(new Set(cands));
+  }
+
+  async _geocode(name, address) {
+    const cacheKey = 'geo:' + (address || name);
+    try {
+      const hit = localStorage.getItem(cacheKey);
+      if (hit) return JSON.parse(hit);
+    } catch (e) {}
+    for (const q of this._geoCandidates(name, address)) {
+      try {
+        const r = await fetch('https://photon.komoot.io/api/?limit=1&lat=35.9&lon=14.42&q=' + encodeURIComponent(q));
+        const j = await r.json();
+        const feat = j && j.features && j.features[0];
+        if (feat && feat.geometry) {
+          const [lng, lat] = feat.geometry.coordinates;
+          if (lat > 35.7 && lat < 36.15 && lng > 14.15 && lng < 14.6) {
+            const res = { lat: +lat.toFixed(6), lng: +lng.toFixed(6) };
+            try { localStorage.setItem(cacheKey, JSON.stringify(res)); } catch (e) {}
+            return res;
+          }
+        }
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, 150));
+    }
+    return null;
+  }
+
+  async _geocodeMissing() {
+    const gen = this._geocodeGen = (this._geocodeGen || 0) + 1;
+    const jobs = [];
+    this.state.data.forEach((cat, ci) => cat.items.forEach((it, ii) => {
+      if (it.approx && (!isFinite(it.lat) || !isFinite(it.lng))) jobs.push({ ci, id: cat.id, ii, name: it.name, it });
+    }));
+    if (!jobs.length) return;
+    this.setState({ lastSync: 'Geocoding ' + jobs.length + ' address-only entries…' });
+    let done = 0;
+    for (const j of jobs) {
+      const res = await this._geocode(j.it.name, j.it.address);
+      done++;
+      if (res && this._geocodeGen === gen) {
+        this.setState(s => {
+          const data = s.data.map((c, ci) => {
+            if (ci !== j.ci || c.id !== j.id) return c;
+            return { ...c, items: c.items.map((it, ii) => (ii !== j.ii || it.name !== j.name) ? it : { ...it, lat: res.lat, lng: res.lng }) };
+          });
+          return { data };
+        }, () => this._syncMarkers());
+      }
+    }
+    const total = this.state.data.reduce((a, c) => a + c.items.length, 0);
+    this.setState({ lastSync: 'Live from Google Maps · ' + total + ' points (' + jobs.length + ' geocoded)' });
+  }
+
+  renderVals() {
+    try {
+      return this._renderVals();
+    } catch (e) {
+      console.error('[render crash]', e);
+      return {
+        searchTerm: '', onSearchChange: () => {}, hasSearch: false, clearSearch: () => {},
+        sidebarOpen: true, sidebarIconEl: null, searchIconEl: null, clearIconEl: null,
+        refreshIconEl: null, routeIconEl: null, toggleSidebar: () => {},
+        sidebarWrapStyle: 'position:absolute; top:88px; bottom:20px; left:20px; width:340px; background:var(--color-neutral-100); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); z-index:1000; padding:16px; font-size:13px; color:#b23d3d;',
+        refreshIconStyle: '', refresh: () => this.refresh(), totalLabel: '', statusText: 'Render error: ' + (e.message || e),
+        categories: [], hasSelection: false, selectionLabel: '', clearSelection: () => {}, planRoute: () => {},
+      };
+    }
+  }
+
+  _renderVals() {
+    const search = this.state.searchTerm.trim().toLowerCase();
+
+    const categories = this.state.data.map(cat => {
+      const dimmed = !cat.enabled;
+      const pickerHsv = this.state.pickerFor === cat.id ? this.state.hsv : hexToHsv(cat.color);
+      const filtered = cat.items
+        .map((it, idx) => ({ it, idx }))
+        .filter(({ it }) => !search || it.name.toLowerCase().includes(search));
+      const showList = cat.expanded || (!!search && filtered.length > 0);
+
+      const visibleItems = filtered.map(({ it, idx }) => {
+        const k = cat.id + '::' + idx;
+        const selected = !!this.state.selected[k];
+        return {
+          name: it.name,
+          color: cat.color,
+          selected,
+          rowStyle: `display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--radius-md); cursor:pointer; ${selected ? 'background:var(--color-accent-100);' : ''}`,
+          onSelect: () => this.focusItem(k, it),
+          pinEl: svgIcon(it.approx ? 'map-pin-off' : 'map-pin', 17, cat.color),
+          approx: !!it.approx,
+          checkEl: svgIcon('check', 15, 'var(--color-accent-2-700)'),
+        };
+      });
+
+      return {
+        name: cat.name,
+        enabled: cat.enabled,
+        showList: cat.enabled && showList,
+        swatchStyle: `position:relative; width:18px; height:18px; border-radius:6px; flex-shrink:0; cursor:pointer; background:${cat.color}; opacity:${dimmed ? 0.4 : 1}; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.12); transition:transform .12s ease; display:inline-flex;`,
+        switchTrackStyle: `width:40px;height:24px;border-radius:999px;border:none;cursor:pointer;flex-shrink:0;position:relative;transition:background .15s ease;background:${cat.enabled ? cat.color : 'var(--color-neutral-300)'};padding:0;`,
+        switchThumbStyle: `width:18px;height:18px;border-radius:999px;background:var(--color-neutral-100);position:absolute;top:3px;left:${cat.enabled ? '19px' : '3px'};transition:left .15s ease;box-shadow:var(--shadow-sm);`,
+        onToggle: () => this.toggleCategory(cat.id),
+        onExpand: () => this.expandCategory(cat.id),
+        chevronEl: svgIcon(showList ? 'chevron-up' : 'chevron-down', 18, 'var(--color-neutral-700)'),
+        tagStyle: `font-size:11.5px; padding:2px 9px; border-radius:999px; background:${dimmed ? 'var(--color-neutral-200)' : 'var(--color-accent-100)'}; color:${dimmed ? 'var(--color-neutral-700)' : 'var(--color-accent-800)'};`,
+        countLabel: dimmed ? 'Hidden' : (search ? filtered.length + ' / ' + cat.items.length : cat.items.length + ''),
+        visibleItems,
+        noMatches: cat.enabled && !!search && filtered.length === 0,
+        color: cat.color,
+        onSwatchToggle: () => this.togglePicker(cat.id),
+        pickerOpen: this.state.pickerFor === cat.id,
+        hex: cat.color.toUpperCase(),
+        onHexChange: (e) => this.setPickerHex(e.target.value),
+        onSvDown: (e) => this._startDrag(e, 'sv'),
+        onHueDown: (e) => this._startDrag(e, 'hue'),
+        onPickerClose: () => this.closePicker(),
+        svStyle: `position:relative; width:100%; height:120px; border-radius:8px; cursor:crosshair; touch-action:none; background:linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, ${hsvToHex(pickerHsv.h, 1, 1)});`,
+        svThumbStyle: `position:absolute; width:14px; height:14px; border-radius:999px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,0.4); transform:translate(-50%,-50%); pointer-events:none; left:${pickerHsv.s * 100}%; top:${(1 - pickerHsv.v) * 100}%; background:${cat.color};`,
+        hueStyle: 'position:relative; width:100%; height:14px; border-radius:999px; margin-top:12px; cursor:pointer; touch-action:none; background:linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);',
+        hueThumbStyle: `position:absolute; top:50%; width:16px; height:16px; border-radius:999px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,0.4); transform:translate(-50%,-50%); pointer-events:none; left:${(pickerHsv.h / 360) * 100}%; background:${hsvToHex(pickerHsv.h, 1, 1)};`,
+        previewStyle: `width:26px; height:26px; border-radius:6px; flex-shrink:0; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15); background:${cat.color};`,
+        presets: PRESETS.map(hex => ({
+          hex,
+          onPick: () => this.setPickerHex(hex),
+          style: `width:22px; height:22px; border-radius:6px; border:2px solid ${cat.color.toLowerCase() === hex.toLowerCase() ? 'var(--color-text)' : '#fff'}; box-shadow:0 0 0 1px rgba(0,0,0,0.15); cursor:pointer; background:${hex}; padding:0;`,
+        })),
+      };
+    });
+
+    const total = this.state.data.reduce((a, c) => a + c.items.length, 0);
+    const shown = this.state.data.reduce((a, c) => a + (c.enabled ? c.items.length : 0), 0);
+
+    const selectedKeys = Object.keys(this.state.selected).filter(k => this.state.selected[k]);
+    const selectedNames = selectedKeys.map(k => {
+      const [cid, idx] = k.split('::');
+      const cat = this.state.data.find(c => c.id === cid);
+      return cat && cat.items[+idx] ? cat.items[+idx].name : null;
+    }).filter(Boolean);
+
+    return {
+      searchTerm: this.state.searchTerm,
+      onSearchChange: (e) => this.setState({ searchTerm: e.target.value }),
+      hasSearch: this.state.searchTerm.length > 0,
+      clearSearch: () => this.setState({ searchTerm: '' }),
+      sidebarOpen: this.state.sidebarOpen,
+      sidebarIconEl: svgIcon(this.state.sidebarOpen ? 'panel-left-close' : 'panel-left-open', 21, 'var(--color-accent-700)'),
+      searchIconEl: svgIcon('search', 20, 'var(--color-accent-700)'),
+      clearIconEl: svgIcon('x', 14, 'var(--color-text)'),
+      refreshIconEl: svgIcon('refresh-cw', 20, 'var(--color-accent-700)', this.state.loading ? { animation: 'spin 1s linear infinite' } : {}),
+      routeIconEl: svgIcon('route', 15, 'currentColor'),
+      toggleSidebar: () => { this.setState(s => ({ sidebarOpen: !s.sidebarOpen })); setTimeout(() => this.mm && this.mm.invalidateSize(), 320); },
+      sidebarWrapStyle: `position:absolute; top:88px; bottom:20px; left:20px; width:340px; max-width:calc(100% - 40px); background:var(--color-neutral-100); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden; z-index:1000; transition: transform .3s ease, opacity .25s ease; transform: translateX(${this.state.sidebarOpen ? '0' : '-120%'}); opacity: ${this.state.sidebarOpen ? 1 : 0}; pointer-events: ${this.state.sidebarOpen ? 'auto' : 'none'};`,
+      refreshIconStyle: `width:20px; height:20px; color:var(--color-accent-700); ${this.state.loading ? 'animation: spin 1s linear infinite;' : ''}`,
+      refresh: () => this.refresh(),
+      totalLabel: shown + ' / ' + total + ' shown',
+      statusText: this.state.lastSync,
+      categories,
+      hasSelection: selectedNames.length > 0,
+      selectionLabel: selectedNames.length + (selectedNames.length === 1 ? ' supplier selected' : ' suppliers selected'),
+      clearSelection: () => this.setState({ selected: {} }),
+      planRoute: () => {
+        if (!selectedNames.length) return;
+        const dest = encodeURIComponent(selectedNames[selectedNames.length - 1]);
+        const waypoints = selectedNames.slice(0, -1).map(n => encodeURIComponent(n)).join('|');
+        let url = 'https://www.google.com/maps/dir/?api=1&destination=' + dest;
+        if (waypoints) url += '&waypoints=' + waypoints;
+        window.open(url, '_blank');
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

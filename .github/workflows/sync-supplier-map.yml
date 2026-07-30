@@ -1,0 +1,28 @@
+name: Sync supplier map data
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # every 30 min
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Fetch + parse KML (server-side, no CORS involved)
+        run: node .github/scripts/sync-kml.mjs
+      - name: Commit if changed
+        run: |
+          git config user.name "supplier-map-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if ! git diff --quiet -- data.json; then
+            git add data.json
+            git commit -m "Sync supplier map data [skip ci]"
+            git push
+          else
+            echo "No changes"
+          fi
